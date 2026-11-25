@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#060b1e">
+<title>Private page</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #060b1e; color: #c9d3ea;
+    font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  .box { min-height: 100%; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; text-align: center; padding: 24px; box-sizing: border-box; }
+  .box b { font-size: 20px; color: #eef1f7; margin: 12px 0 4px; }
+  .box span { color: #8794b5; max-width: 320px; }
+  #msg[hidden] { display: none; }
+</style>
+</head>
+<body>
+<div class="box" id="msg" hidden>
+  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#8794b5" stroke-width="1.6" aria-hidden="true">
+    <rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+  <b>This page is private</b>
+  <span>Scan the QR code on the poster to open it.</span>
+</div>
+<script>
+(async () => {
+  const fail = () => { document.getElementById("msg").hidden = false; };
+  try {
+    const k = new URLSearchParams(location.hash.slice(1)).get("k");
+    if (!k || !window.crypto || !crypto.subtle || !window.DecompressionStream) return fail();
+    let t = k.replace(/-/g, "+").replace(/_/g, "/"); t += "===".slice((t.length + 3) % 4);
+    const key = await crypto.subtle.importKey("raw", Uint8Array.from(atob(t), c => c.charCodeAt(0)),
+      "AES-GCM", false, ["decrypt"]);
+    const raw = new Uint8Array(await (await fetch("data.bin")).arrayBuffer());
+    const zipped = await crypto.subtle.decrypt({ name: "AES-GCM", iv: raw.slice(0, 12) }, key, raw.slice(12));
+    const text = await new Response(new Blob([zipped]).stream()
+      .pipeThrough(new DecompressionStream("gzip"))).text();
+    const b = JSON.parse(text);
+    window.__REPLAY = b.replay;
+    document.open(); document.write(b.html); document.close();
+  } catch (e) { fail(); }
+})();
+</script>
+</body>
+</html>
